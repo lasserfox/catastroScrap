@@ -1,9 +1,14 @@
 import pandas as pd, helper, webbrowser, time
+from datetime import datetime
 from pycatastro import PyCatastro as catas
 import json, pprint
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+
 
 import threading
 
@@ -12,7 +17,7 @@ import threading
 # print (json.dumps(catas.ConsultaNumero(provincia='madrid',municipio='paracuellos de jarama',tipovia='cl',nombrevia='camilo jose cela',numero='7')))
 OPENWEBONFAIL = True
 FIRSTPAGE = True
-
+SLEEP = 2
 file = 'test.xlsx'
 xl = pd.ExcelFile(file)
 
@@ -23,6 +28,9 @@ wb = Workbook()
 sheet1 = wb.add_sheet('Script_Cat')
 
 
+start = datetime.now()
+time.sleep(1)
+print ("Prueba:",datetime.now()-start)
 
 
 from openpyxl import load_workbook
@@ -35,31 +43,41 @@ df = pd.DataFrame()
 
 
 for i, row in enumerate(df1.values):
+    print(i)
+
     codpost_ciudad = '{:02}'.format(int(str(row[10]).replace('<sp>', ' ').split('.')[0]))
     prov = helper.normalize(helper.getProvincia(codpost_ciudad + '0'))
     if prov is None:
         raise Exception('12', '-', 'LA PROVINCIA NO EXISTE')
     munic = helper.normalize (str(row[11]).replace('<sp>', ' '))
     calle = helper.normalize(str(row[12]).replace('<sp>', ' '))
-    num = str(row[13]).replace('<sp>', ' ')
+    num = int(float(str(row[13]).replace('<sp>', ' ')))
     puerta = str(row[14]).replace('<sp>', ' ')
     piso = str(row[15]).replace('<sp>', ' ')
 
     try:
         datos_munic = catas.ConsultaMunicipio(provincia=prov, municipio=munic)
         data_calle = json.loads(json.dumps(catas.ConsultaVia(provincia=prov, municipio=munic, nombrevia=calle)))
+        if (i == 48):
+            print(i)
         cod_post = data_calle['consulta_callejero']['callejero']['calle']['loine']['cp']
         cod_munic = data_calle['consulta_callejero']['callejero']['calle']['loine']['cm']
         tipo_via = data_calle['consulta_callejero']['callejero']['calle']['dir']['tv']
         nombre_via = data_calle['consulta_callejero']['callejero']['calle']['dir']['nv']
         cod_via = data_calle['consulta_callejero']['callejero']['calle']['dir']['cv']
 
+
         result = json.loads(json.dumps(catas.Consulta_DNPLOC(provincia=prov, municipio=munic, sigla=tipo_via, calle=calle, numero=num, planta=piso, puerta=puerta)))
-        ref = str(result['consulta_dnp']['bico']['bi']['idbi']['rc']['pc1']) + str(
+        try:
+            ref = str(result['consulta_dnp']['bico']['bi']['idbi']['rc']['pc1']) + str(
             result['consulta_dnp']['bico']['bi']['idbi']['rc']['pc2']) + str(
             result['consulta_dnp']['bico']['bi']['idbi']['rc']['car']) + str(
             result['consulta_dnp']['bico']['bi']['idbi']['rc']['cc1']) + str(
             result['consulta_dnp']['bico']['bi']['idbi']['rc']['cc2'])
+        except Exception as e:
+            data_calle['consulta_callejero'] = result['consulta_dnp']
+
+            raise
         print(ref)
     except Exception as e:
         try:
@@ -74,52 +92,73 @@ for i, row in enumerate(df1.values):
             wb.save('example.xlsx')
 
 
-            print("TODO: Completar EXCEL:", cod_error, '-', desc_error)
-
             if OPENWEBONFAIL:
-                if cod_error == '10':
-                    if FIRSTPAGE :
-                        driver = webdriver.Chrome()
-                        FIRSTPAGE=False
-                    else:
-                        driver.execute_script("window.open('');")
-                        time.sleep(1)
-                        Window_List = driver.window_handles
-                        driver.switch_to.window(Window_List[-1])
-
-                    # driver.get("https://www1.sedecatastro.gob.es/Cartografia/mapa.aspx?buscar=S")
-                    driver.implicitly_wait(5)
-                    driver.get("https://www1.sedecatastro.gob.es/CYCBienInmueble/OVCBusqueda.aspx?")
-                    wait = WebDriverWait(driver, 10)
-
-                    driver.find_element_by_link_text("CALLE/NÚMERO").click()
-                    time.sleep(1)
-                    driver.find_element_by_id("ctl00_Contenido_provinceSelector").send_keys(prov)
-                    time.sleep(1)
-                    driver.find_element_by_id("ctl00_Contenido_provinceSelector").send_keys(Keys.TAB)
-                    # driver.find_element_by_id("ui-id-8").click()
-                    driver.find_element_by_id("ctl00_Contenido_municipioSelector").send_keys(munic)
-                    time.sleep(1)
-                    driver.find_element_by_id("ctl00_Contenido_municipioSelector").send_keys(Keys.TAB)
-                    # driver.find_element_by_id("ui-id-56").click()
-                    driver.find_element_by_id("ctl00_Contenido_viaSelector").send_keys(calle)
-                    time.sleep(1)
-                    # driver.find_eleme nt_by_id("ctl00_Contenido_viaSelector").send_keys(Keys.TAB)
-                    input("Press Enter to continue...")
-                    FIRSTPAGE=True
-                    driver.close()
-
-
+                if FIRSTPAGE :
+                    driver = webdriver.Chrome()
+                    FIRSTPAGE=False
                 else:
-                    print("TODO: Completar EXCEL:", cod_error, '-', desc_error)
+                    driver.execute_script("window.open('');")
+                    time.sleep(SLEEP)
+                    Window_List = driver.window_handles
+                    driver.switch_to.window(Window_List[-1])
+
+                # driver.get("https://www1.sedecatastro.gob.es/Cartografia/mapa.aspx?buscar=S")
+                driver.implicitly_wait(5)
+                driver.get("https://www1.sedecatastro.gob.es/CYCBienInmueble/OVCBusqueda.aspx?")
+                # wait = WebDriverWait(driver, 10)
+
+                driver.find_element_by_link_text("CALLE/NÚMERO").click()
+                driver.find_element_by_id("ctl00_Contenido_provinceSelector").send_keys(prov)
+                time.sleep(SLEEP)
+                driver.find_element_by_id("ctl00_Contenido_provinceSelector").send_keys(Keys.TAB)
+                driver.find_element_by_id("ctl00_Contenido_municipioSelector").send_keys(munic)
+                time.sleep(SLEEP)
+                driver.find_element_by_id("ctl00_Contenido_municipioSelector").send_keys(Keys.TAB)
+                driver.find_element_by_id("ctl00_Contenido_viaSelector").send_keys(calle)
+                # time.sleep(1)
+                driver.find_element_by_xpath(u"(.//*[normalize-space(text()) and normalize-space(.)='Vía'])[1]/following::i[1]").click()
+                # time.sleep(1)
+                # driver.find_element_by_id("ctl00_Contenido_txtTodasVias").click()
+                time.sleep(SLEEP)
+                driver.find_element_by_id("ctl00_Contenido_txtTodasVias").send_keys(str(calle).split(" ")[-1])
+                time.sleep(SLEEP+1)
+                driver.find_element_by_id("ctl00_Contenido_txtTodasVias").send_keys(Keys.TAB)
+                try:
+                    element = WebDriverWait(driver, 30).until(EC.element_to_be_clickable((By.ID, "AddVia")))
+                except Exception as e:
+                    continue
+
+                driver.find_element_by_id("AddVia").click()
+
+
+                element = WebDriverWait(driver, 3600).until(EC.element_to_be_clickable((By.ID, "ctl00_Contenido_txtNum")))
+                driver.find_element_by_id("ctl00_Contenido_txtNum").send_keys(num)
+                time.sleep(SLEEP)
+                driver.find_element_by_id("ctl00_Contenido_btnDatos").click()
+                driver.find_element_by_xpath(u"(.//*[normalize-space(text()) and normalize-space(.)='Vía'])[1]/following::i[1]").click()
+
+                # driver.find_element_by_id("ctl00_Contenido_btnNuevaCartografia").click()
+                # driver.find_element_by_xpath(u"(.//*[normalize-space(text()) and normalize-space(.)='Vía'])[1]/following::i[1]").click()
+                # driver.find_element_by_id("ctl00_Contenido_Label12").click()
+                # driver.find_element_by_id("ctl00_Contenido_txtNum").click()
+                # driver.find_element_by_id("ctl00_Contenido_txtNum").clear()
+
+                # driver.find_eleme nt_by_id("ctl00_Contenido_viaSelector").send_keys(Keys.TAB)
+                # input("Press Enter to continue...")
+                # driver.close()
+                # cod=input("Press Enter to continue...")
+                # print (cod)
+            else:
+                print("TODO: Completar EXCEL:", cod_error, '-', desc_error)
 
                     # driver.close()
-
-
         except Exception as e:
-            print("ERROR DESONOCIDO:", e.with_traceback())
-            exit(-1)
+            print("ERROR DESONOCIDO:")
+end = datetime.now()
 
+print ("Tiempo:",end-start)
+
+input("Press Enter to continue...")
 
 
 
